@@ -9,15 +9,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: DNS
+    # ВАЖНО: Даем права на запись, чтобы бот мог сделать коммит
+    permissions:
+      contents: write
 
     env:
       DNS: ${{ vars.DNS }}
       BLOCK: ${{ vars.BLOCK }}
       REDIRECT: ${{ vars.REDIRECT }}
-
       CLIENT_ID: ${{ secrets.CLIENT_ID }}
       AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-
       TZ: Europe/Moscow
 
     steps:
@@ -38,3 +39,11 @@ jobs:
         run: |
           echo "Starting application..."
           java --enable-preview -jar target/*.jar
+
+      - name: Keep alive (Prevent workflow disabling)
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # Делаем пустой коммит, чтобы сбросить счетчик 60 дней
+          git commit --allow-empty -m "Heartbeat: Activity check $(date +'%Y-%m-%d')"
+          git push
