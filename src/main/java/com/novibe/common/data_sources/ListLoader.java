@@ -36,20 +36,45 @@ public abstract class ListLoader<T> {
                 .map(url -> scope.fork(() -> fetchList(url)))
                 .forEach(requests::add);
         scope.join();
+
         return requests.stream()
+                .filter(subtask -> {
+                    // Проверяем статус выполнения задачи
+                    if (subtask.state() == StructuredTaskScope.Subtask.State.SUCCESS) {
+                        return true;
+                    } else {
+                        Log.fail("Failed to fetch list from one of the sources");
+                        return false;
+                    }
+                })
                 .map(StructuredTaskScope.Subtask::get)
                 .flatMap(this::lineParser)
                 .distinct()
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    @SneakyThrows
     private String fetchList(String url) {
-        Log.io("Loading %s list from url: %s".formatted(listType(), url));
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .GET()
-                .build();
-        return client.send(request, HttpResponse.BodyHandlers.ofString()).body();
+        try {
+            Log.io("Loading %s list from url: %s".formatted(listType(), url));
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(30))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                Log.fail("HTTP error %d when fetching: %s".formatted(response.statusCode(), url));
+                throw new RuntimeException("HTTP " + response.statusCode());
+            }
+
+            Log.io("Successfully loaded %s list from: %s".formatted(listType(), url));
+            return response.body();
+
+        } catch (Exception e) {
+            Log.fail("Error fetching list from %s: %s".formatted(url, e.getMessage()));
+            throw new RuntimeException("Failed to fetch: " + url, e);
+        }
     }
 
 }
