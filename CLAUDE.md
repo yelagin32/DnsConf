@@ -119,6 +119,20 @@ Expected format for source URLs:
 1.2.3.4 redirected-domain.com     # Parsed as redirect
 ```
 
+**Parser Features** (improved April 2026):
+- Handles tabs and multiple spaces between IP and domain
+- Validates IP addresses using regex pattern
+- Validates domain names (basic checks)
+- Filters out invalid entries with detailed logging
+- Graceful error handling - continues processing if one source fails
+- HTTP timeout: 30 seconds per request
+- Logs all parsing errors for debugging
+
+**Common Source Example**: GeoHide DNS hosts file
+- ~1,037 unique domains redirected through proxy servers (bypassing geo-blocks)
+- ~1,600 domains blocked (ad/tracking domains from Xiaomi, Microsoft, Apple, Google, Yandex)
+- See `ANALYSIS.md` for detailed breakdown of parsed domains
+
 ## GitHub Actions Integration
 
 The project is designed to run as a scheduled GitHub Action (daily at 01:30 UTC).
@@ -142,6 +156,15 @@ The project is designed to run as a scheduled GitHub Action (daily at 01:30 UTC)
 - Override `lineParser()` method to change filtering logic
 - The base `ListLoader` handles HTTP fetching and deduplication
 
+**Recent Improvements (April 2026)**:
+- Replaced `indexOf/substring` with `split("\\s+")` for robust whitespace handling
+- Added IP address validation (regex pattern for IPv4)
+- Added domain validation (basic format checks)
+- Improved error handling: continues processing if one URL fails
+- Added HTTP timeout (30s) and status code checking
+- Better logging: all invalid entries are logged with reasons
+- Fixed bug: parser no longer crashes on comment-only lines like `# 37.230.192.51`
+
 ### Debugging API Issues
 - Check `Log` class output for step-by-step execution
 - HTTP requests/responses logged in provider-specific clients
@@ -153,3 +176,41 @@ The project is designed to run as a scheduled GitHub Action (daily at 01:30 UTC)
 - Maven Shade plugin creates fat JAR with all dependencies
 - Spring context is manually created (no auto-configuration)
 - Session IDs in Cloudflare descriptions prevent accidental deletion of manually created rules
+
+## Troubleshooting
+
+### Common Issues
+
+**StringIndexOutOfBoundsException in parser**
+- Fixed in April 2026 update
+- Caused by hosts file entries without spaces (e.g., comment-only lines)
+- Solution: Parser now validates format before processing
+
+**HTTP timeout errors**
+- Default timeout: 30 seconds
+- Check network connectivity to source URLs
+- Verify URLs are accessible and return valid hosts file format
+
+**Invalid IP address errors**
+- Parser validates IPv4 format: `xxx.xxx.xxx.xxx`
+- Check source file for malformed IP addresses
+- Invalid entries are logged and skipped
+
+**Rate limiting (NextDNS)**
+- NextDNS API: 60 requests/minute limit
+- Handled automatically by `NextDnsRateLimitedApiProcessor`
+- Large lists may take several minutes to sync
+
+**GitHub Actions Node.js warnings**
+- Updated to actions/checkout@v5 and actions/setup-java@v5 (April 2026)
+- Uses Node.js 24 via `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true`
+
+### Debugging Tips
+
+1. Check GitHub Actions logs for detailed error messages
+2. Run locally with environment variables to reproduce issues
+3. Enable verbose logging in `Log` class if needed
+4. Verify source URLs return valid hosts file format:
+   ```bash
+   curl -s "https://your-source-url/hosts" | head -50
+   ```
